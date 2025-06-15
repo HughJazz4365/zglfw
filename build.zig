@@ -30,7 +30,7 @@ pub fn build(b: *std.Build) void {
     const options_module = options_step.createModule();
 
     const module = b.addModule("root", .{
-        .root_source_file = b.path("src/zglfw.zig"),
+        .root_source_file = b.path("src/glfw.zig"),
         .imports = &.{
             .{ .name = "zglfw_options", .module = options_module },
         },
