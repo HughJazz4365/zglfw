@@ -656,7 +656,7 @@ pub fn getVideoModes(monitor: ?*Monitor, count: *c_int) ?[*]Vidmode {
 
 extern fn glfwGetVideoMode(monitor: ?*Monitor) ?*Vidmode;
 pub fn getVideoMode(monitor: ?*Monitor) ?*Vidmode {
-    const res = getVideoMode(monitor);
+    const res = glfwGetVideoMode(monitor);
     errorCheck2();
     return res;
 }
