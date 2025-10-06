@@ -71,6 +71,10 @@ extern fn glfwWaitEvents() void;
 pub const waitEventsTimeout = glfwWaitEventsTimeout;
 extern fn glfwWaitEventsTimeout(timeout: f64) void;
 
+/// `pub fn postEmptyEvent() void`
+pub const postEmptyEvent = glfwPostEmptyEvent;
+extern fn glfwPostEmptyEvent() void;
+
 pub fn isVulkanSupported() bool {
     return glfwVulkanSupported() == TRUE;
 }
@@ -85,6 +89,55 @@ pub fn getRequiredInstanceExtensions() Error![][*:0]const u8 {
     return error.APIUnavailable;
 }
 extern fn glfwGetRequiredInstanceExtensions(count: *u32) ?*?[*:0]const u8;
+
+pub const VulkanFn = *const fn () callconv(.c) void;
+
+const vk = if (options.enable_vulkan_import)
+    @import("vulkan")
+else
+    struct {
+        pub const Instance = ?*const anyopaque;
+        pub const PhysicalDevice = ?*const anyopaque;
+        pub const AllocationCallbacks = anyopaque;
+        pub const SurfaceKHR = anyopaque;
+    };
+
+pub const getInstanceProcAddress = glfwGetInstanceProcAddress;
+extern fn glfwGetInstanceProcAddress(instance: vk.Instance, procname: [*:0]const u8) ?VulkanFn;
+
+pub fn getPhysicalDevicePresentationSupport(
+    instance: vk.Instance,
+    device: vk.PhysicalDevice,
+    queuefamily: u32,
+) Error!bool {
+    const result = glfwGetPhysicalDevicePresentationSupport(instance, device, queuefamily) == TRUE;
+    try maybeError();
+    return result;
+}
+extern fn glfwGetPhysicalDevicePresentationSupport(
+    instance: vk.Instance,
+    device: vk.PhysicalDevice,
+    queuefamily: u32,
+) Bool;
+
+pub fn createWindowSurface(
+    instance: vk.Instance,
+    window: *Window,
+    allocator: ?*const vk.AllocationCallbacks,
+    surface: *vk.SurfaceKHR,
+) Error!void {
+    if (glfwCreateWindowSurface(instance, window, allocator, surface) == 0) {
+        return;
+    }
+    try maybeError();
+    return Error.APIUnavailable;
+}
+extern fn glfwCreateWindowSurface(
+    instance: vk.Instance,
+    window: *Window,
+    allocator: ?*const vk.AllocationCallbacks,
+    surface: *vk.SurfaceKHR,
+) c_int;
 
 /// `pub fn getTime() f64`
 pub const getTime = glfwGetTime;
@@ -722,11 +775,19 @@ pub const Window = opaque {
     pub const setCursorEnterCallback = zglfw.setCursorEnterCallback;
     pub const getMonitor = zglfw.getWindowMonitor;
     pub const setMonitor = zglfw.setWindowMonitor;
+    pub const iconify = zglfw.iconifyWindow;
+    pub const restore = zglfw.restoreWindow;
+    pub const maximize = zglfw.maximizeWindow;
     pub const show = zglfw.showWindow;
+    pub const hide = zglfw.hideWindow;
     pub const focus = zglfw.focusWindow;
+    pub const requestAttention = zglfw.requestWindowAttention;
     pub const getKey = zglfw.getKey;
     pub const getMouseButton = zglfw.getMouseButton;
     pub const setSizeLimits = zglfw.setWindowSizeLimits;
+    pub const setAspectRatio = zglfw.setWindowAspectRatio;
+    pub const getOpacity = zglfw.getWindowOpacity;
+    pub const setOpacity = zglfw.setWindowOpacity;
     pub const setSize = zglfw.setWindowSize;
     pub const setPos = zglfw.setWindowPos;
     pub const setTitle = zglfw.setWindowTitle;
@@ -755,23 +816,32 @@ pub const Window = opaque {
         return .{ xscale, yscale };
     }
 
+    pub fn getFrameSize(self: *Window) [4]c_int {
+        var left: c_int = 0;
+        var top: c_int = 0;
+        var right: c_int = 0;
+        var bottom: c_int = 0;
+        zglfw.getWindowFrameSize(self, &left, &top, &right, &bottom);
+        return .{ left, top, right, bottom };
+    }
+
     pub fn getFramebufferSize(self: *Window) [2]c_int {
-        var width: c_int = 0.0;
-        var height: c_int = 0.0;
+        var width: c_int = 0;
+        var height: c_int = 0;
         zglfw.getFramebufferSize(self, &width, &height);
         return .{ width, height };
     }
 
     pub fn getSize(self: *Window) [2]c_int {
-        var width: c_int = 0.0;
-        var heght: c_int = 0.0;
+        var width: c_int = 0;
+        var heght: c_int = 0;
         zglfw.getWindowSize(self, &width, &heght);
         return .{ width, heght };
     }
 
     pub fn getPos(self: *Window) [2]c_int {
-        var xpos: c_int = 0.0;
-        var ypos: c_int = 0.0;
+        var xpos: c_int = 0;
+        var ypos: c_int = 0;
         zglfw.getWindowPos(self, &xpos, &ypos);
         return .{ xpos, ypos };
     }
@@ -921,11 +991,26 @@ extern fn glfwSetWindowMonitor(
     refreshRate: c_int,
 ) void;
 
+pub const iconifyWindow = glfwIconifyWindow;
+extern fn glfwIconifyWindow(*Window) void;
+
+pub const restoreWindow = glfwRestoreWindow;
+extern fn glfwRestoreWindow(*Window) void;
+
+pub const maximizeWindow = glfwMaximizeWindow;
+extern fn glfwMaximizeWindow(*Window) void;
+
 pub const showWindow = glfwShowWindow;
 extern fn glfwShowWindow(*Window) void;
 
+pub const hideWindow = glfwHideWindow;
+extern fn glfwHideWindow(*Window) void;
+
 pub const focusWindow = glfwFocusWindow;
 extern fn glfwFocusWindow(*Window) void;
+
+pub const requestWindowAttention = glfwRequestWindowAttention;
+extern fn glfwRequestWindowAttention(*Window) void;
 
 pub const getKey = glfwGetKey;
 extern fn glfwGetKey(*Window, key: Key) Action;
@@ -942,8 +1027,20 @@ extern fn glfwSetCursorPos(*Window, xpos: f64, ypos: f64) void;
 pub const setWindowSizeLimits = glfwSetWindowSizeLimits;
 extern fn glfwSetWindowSizeLimits(*Window, min_w: c_int, min_h: c_int, max_w: c_int, max_h: c_int) void;
 
+pub const setWindowAspectRatio = glfwSetWindowAspectRatio;
+extern fn glfwSetWindowAspectRatio(*Window, numer: c_int, denom: c_int) void;
+
 pub const getWindowContentScale = glfwGetWindowContentScale;
 extern fn glfwGetWindowContentScale(*Window, xscale: ?*f32, yscale: ?*f32) void;
+
+pub const getWindowFrameSize = glfwGetWindowFrameSize;
+extern fn glfwGetWindowFrameSize(*Window, left: ?*c_int, top: ?*c_int, right: ?*c_int, bottom: ?*c_int) void;
+
+pub const getWindowOpacity = glfwGetWindowOpacity;
+extern fn glfwGetWindowOpacity(*Window) f32;
+
+pub const setWindowOpacity = glfwSetWindowOpacity;
+extern fn glfwSetWindowOpacity(*Window, opacity: f32) void;
 
 pub const getFramebufferSize = glfwGetFramebufferSize;
 extern fn glfwGetFramebufferSize(*Window, width: ?*c_int, height: ?*c_int) void;
