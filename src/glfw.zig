@@ -363,6 +363,14 @@ pub const NativeContextAPI: ContextAPIAttribute = 0x00036001;
 pub const EGLContextAPI: ContextAPIAttribute = 0x00036002;
 pub const OSMesaContextAPI: ContextAPIAttribute = 0x00036003;
 
+pub const PlatformHint = c_int;
+pub const AnyPlatform: PlatformHint = 0x00060000;
+pub const PlatformWin32: PlatformHint = 0x00060001;
+pub const PlatformCocoa: PlatformHint = 0x00060002;
+pub const PlatformWayland: PlatformHint = 0x00060003;
+pub const PlatformX11: PlatformHint = 0x00060004;
+pub const PlatformNull: PlatformHint = 0x00060005;
+
 pub const VkInstance = usize;
 pub const VkPhysicalDevice = usize;
 pub const VkSurfaceKHR = u64;
@@ -440,7 +448,7 @@ else if (builtin.abi == .android and (builtin.cpu.arch.isARM() or builtin.cpu.ar
     // as it does by default when compiling for the armeabi-v7a NDK ABI.
     .AAPCSVFP
 else
-    .c;
+    .C;
 
 pub const VkAllocationCallbacks = extern struct {
     p_user_data: ?*anyopaque = null,
@@ -469,6 +477,7 @@ pub const InitHint = c_int;
 pub const JoystickHatButtons: InitHint = 0x00050001;
 pub const CocoaChdirResources: InitHint = 0x00051001;
 pub const CocoaMenubar: InitHint = 0x00051002;
+pub const Platform: InitHint = 0x00050003;
 
 pub const GLproc = *const fn () callconv(.c) void;
 pub const VKproc = *const fn () callconv(.c) void;
@@ -558,7 +567,7 @@ fn errorCheck() !void {
 fn errorCheck2() void {
     errorCheck() catch |err| {
         if (err != GLFWError.NoError) {
-            std.debug.print("error: {s}\n", .{@errorName(err)});
+            std.log.scoped(.zGLFW).err("{s}", .{@errorName(err)});
         }
     };
 }
@@ -569,8 +578,8 @@ pub fn terminate() void {
 }
 
 extern fn glfwInitHint(hint: c_int, value: c_int) void;
-pub fn initHint(hint: InitHint, value: bool) void {
-    glfwInitHint((hint), @intFromBool(value));
+pub fn initHint(hint: InitHint, value: c_int) void {
+    glfwInitHint((hint), value);
     errorCheck2();
 }
 
@@ -1157,7 +1166,7 @@ pub fn setJoystickUserPointer(jid: c_int, pointer: *anyopaque) void {
 
 extern fn glfwGetJoystickUserPointer(jid: c_int) *anyopaque;
 pub fn getJoystickUserPointer(jid: c_int) *anyopaque {
-    const res = getJoystickUserPointer(jid);
+    const res = glfwGetJoystickUserPointer(jid);
     errorCheck2();
     return res;
 }
